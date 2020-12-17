@@ -1,0 +1,903 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Introduction\n",
+    "New York City's demographics show that it is a large and ethnically diverse metropolis. It is the largest city in the United States with a long history of international immigration. New York City was home to nearly 8.5 million people in 2014, accounting for over 40% of the population of New York State and a slightly lower percentage of the New York metropolitan area, home to approximately 23.6 million. Over the last decade the city has been growing faster than the region. The New York region continues to be by far the leading metropolitan gateway for legal immigrants admitted into the United States.\n",
+    "Throughout its history, New York City has been a major point of entry for immigrants; the term \"melting pot\" was coined to describe densely populated immigrant neighborhoods on the Lower East Side. As many as 800 languages are spoken in New York, making it the most linguistically diverse city in the world. English remains the most widely spoken language, although there are areas in the outer boroughs in which up to 25% of people speak English as an alternate language, and/or have limited or no English language fluency. English is least spoken in neighborhoods such as Flushing, Sunset Park, and Corona.\n",
+    "With it's diverse culture , comes diverse food items. There are many resturants in New york City, each beloning to different categories like Chinese , Indian , French etc.\n",
+    "So as part of this project , we will list and visualize all major parts of New York City that has great indian resturants."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Data\n",
+    "Data For this project we need the following data :\n",
+    "New York City data that contains list Boroughs, Neighborhoods along with their latitude and longitude. Data source : https://cocl.us/new_york_dataset Description : This data set contains the required information. And we will use this data set to explore various neighborhoods of new york city. Indian resturants in each neighborhood of new york city. Data source : Fousquare API Description : By using this api we will get all the venues in each neighborhood. We can filter these venues to get only indian resturants. GeoSpace data Data source : https://data.cityofnewyork.us/City-Government/Borough-Boundaries/tqmj-j8zm Description : By using this geo space data we will get the New york Borough boundaries that will help us visualize choropleth map."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Approach\n",
+    "Collect the new york city data from https://cocl.us/new_york_dataset\n",
+    "Using FourSquare API we will find all venues for each neighborhood.\n",
+    "Filter out all venues that are Indian Resturants.\n",
+    "Find rating , tips and like count for each Indian Resturants using FourSquare API.\n",
+    "Using rating for each resturant , we will sort that data.\n",
+    "Visualize the Ranking of neighborhoods using folium library(python)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Queries that can be answered using above dataset\n",
+    "What is best location in New York City for Indian Cuisine ?\n",
+    "Which areas have potential Indian Resturant Market ?\n",
+    "Which all areas lack Indian Resturants ?\n",
+    "Which is the best place to stay if I prefer Indian Cuisine ?"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Analysis\n",
+    "Required Libraries\n",
+    "pandas and numpy for handling data.\n",
+    "request module for using FourSquare API.\n",
+    "geopy to get co-ordinates of City of New York.\n",
+    "folium to visualize the results on a map"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Collecting geocoder\n",
+      "  Downloading geocoder-1.38.1-py2.py3-none-any.whl (98 kB)\n",
+      "\u001b[K     |████████████████████████████████| 98 kB 1.0 MB/s eta 0:00:01\n",
+      "\u001b[?25hRequirement already satisfied: click in ./opt/anaconda3/lib/python3.7/site-packages (from geocoder) (7.0)\n",
+      "Requirement already satisfied: six in ./opt/anaconda3/lib/python3.7/site-packages (from geocoder) (1.14.0)\n",
+      "Requirement already satisfied: future in ./opt/anaconda3/lib/python3.7/site-packages (from geocoder) (0.18.2)\n",
+      "Collecting ratelim\n",
+      "  Downloading ratelim-0.1.6-py2.py3-none-any.whl (4.0 kB)\n",
+      "Requirement already satisfied: requests in ./opt/anaconda3/lib/python3.7/site-packages (from geocoder) (2.22.0)\n",
+      "Requirement already satisfied: decorator in ./opt/anaconda3/lib/python3.7/site-packages (from ratelim->geocoder) (4.4.1)\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in ./opt/anaconda3/lib/python3.7/site-packages (from requests->geocoder) (2019.11.28)\n",
+      "Requirement already satisfied: urllib3!=1.25.0,!=1.25.1,<1.26,>=1.21.1 in ./opt/anaconda3/lib/python3.7/site-packages (from requests->geocoder) (1.25.8)\n",
+      "Requirement already satisfied: idna<2.9,>=2.5 in ./opt/anaconda3/lib/python3.7/site-packages (from requests->geocoder) (2.8)\n",
+      "Requirement already satisfied: chardet<3.1.0,>=3.0.2 in ./opt/anaconda3/lib/python3.7/site-packages (from requests->geocoder) (3.0.4)\n",
+      "Installing collected packages: ratelim, geocoder\n",
+      "Successfully installed geocoder-1.38.1 ratelim-0.1.6\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install geocoder"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Libraries imported.\n"
+     ]
+    }
+   ],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "pd.set_option('display.max_columns', None)\n",
+    "pd.set_option('display.max_rows', None)\n",
+    "import requests\n",
+    "import sys\n",
+    "from bs4 import BeautifulSoup\n",
+    "import geocoder\n",
+    "import os\n",
+    "import folium # map rendering library\n",
+    "from geopy.geocoders import Nominatim \n",
+    "import matplotlib.pyplot as plt\n",
+    "import matplotlib.cm as cm\n",
+    "import matplotlib.colors as colors\n",
+    "%matplotlib inline\n",
+    "\n",
+    "\n",
+    "print('Libraries imported.')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def geo_location(address):\n",
+    "    # get geo location of address\n",
+    "    geolocator = Nominatim(user_agent=\"ny_explorer\")\n",
+    "    location = geolocator.geocode(address)\n",
+    "    latitude = location.latitude\n",
+    "    longitude = location.longitude\n",
+    "    return latitude,longitude"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_venues(lat,lng):\n",
+    "    \n",
+    "    #set variables\n",
+    "    radius=1000\n",
+    "    LIMIT=100\n",
+    "    CLIENT_ID = '########################################' # changed my Foursquare ID\n",
+    "    CLIENT_SECRET = '##################################' # changed Foursquare Secret\n",
+    "    VERSION = '20180605' # Foursquare API version\n",
+    "    \n",
+    "    #url to fetch data from foursquare api\n",
+    "    url = 'https://api.foursquare.com/v2/venues/explore?&client_id={}&client_secret={}&v={}&ll={},{}&radius={}&limit={}'.format(\n",
+    "            CLIENT_ID, \n",
+    "            CLIENT_SECRET, \n",
+    "            VERSION, \n",
+    "            lat, \n",
+    "            lng, \n",
+    "            radius, \n",
+    "            LIMIT)\n",
+    "    \n",
+    "    # get all the data\n",
+    "    results = requests.get(url).json()\n",
+    "    venue_data=results[\"response\"]['groups'][0]['items']\n",
+    "    venue_details=[]\n",
+    "    for row in venue_data:\n",
+    "        try:\n",
+    "            venue_id=row['venue']['id']\n",
+    "            venue_name=row['venue']['name']\n",
+    "            venue_category=row['venue']['categories'][0]['name']\n",
+    "            venue_details.append([venue_id,venue_name,venue_category])\n",
+    "        except KeyError:\n",
+    "            pass\n",
+    "        \n",
+    "    column_names=['ID','Name','Category']\n",
+    "    df = pd.DataFrame(venue_details,columns=column_names)\n",
+    "    print(\"done\")\n",
+    "    return df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_venue_details(venue_id):\n",
+    "        \n",
+    "    CLIENT_ID = '###########################' # i have changed the id with ##\n",
+    "    CLIENT_SECRET = '############################' # i have changed the secret with ##\n",
+    "    VERSION = '20180605' # Foursquare API version\n",
+    "    \n",
+    "    #url to fetch data from foursquare api\n",
+    "    url = 'https://api.foursquare.com/v2/venues/{}?&client_id={}&client_secret={}&v={}'.format(\n",
+    "            venue_id,\n",
+    "            CLIENT_ID, \n",
+    "            CLIENT_SECRET, \n",
+    "            VERSION)\n",
+    "    \n",
+    "    # get all the data\n",
+    "    results = requests.get(url).json()\n",
+    "    venue_data=results['response']['venue']\n",
+    "    venue_details=[]\n",
+    "    try:\n",
+    "        venue_id=venue_data['id']\n",
+    "        venue_name=venue_data['name']\n",
+    "        venue_likes=venue_data['likes']['count']\n",
+    "        venue_rating=venue_data['rating']\n",
+    "        venue_tips=venue_data['tips']['count']\n",
+    "        venue_details.append([venue_id,venue_name,venue_likes,venue_rating,venue_tips])\n",
+    "    except KeyError:\n",
+    "        pass\n",
+    "        \n",
+    "    column_names=['ID','Name','Likes','Rating','Tips']\n",
+    "    df = pd.DataFrame(venue_details,columns=column_names)\n",
+    "    return df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_new_york_data():\n",
+    "    url='https://cocl.us/new_york_dataset'\n",
+    "    resp=requests.get(url).json()\n",
+    "    # all data is present in features label\n",
+    "    features=resp['features']\n",
+    "    \n",
+    "    # define the dataframe columns\n",
+    "    column_names = ['Borough', 'Neighborhood', 'Latitude', 'Longitude'] \n",
+    "    # instantiate the dataframe\n",
+    "    new_york_data = pd.DataFrame(columns=column_names)\n",
+    "    \n",
+    "    for data in features:\n",
+    "        borough = data['properties']['borough'] \n",
+    "        neighborhood_name = data['properties']['name']\n",
+    "        \n",
+    "        neighborhood_latlon = data['geometry']['coordinates']\n",
+    "        neighborhood_lat = neighborhood_latlon[1]\n",
+    "        neighborhood_lon = neighborhood_latlon[0]\n",
+    "    \n",
+    "        new_york_data = new_york_data.append({'Borough': borough,\n",
+    "                                          'Neighborhood': neighborhood_name,\n",
+    "                                          'Latitude': neighborhood_lat,\n",
+    "                                          'Longitude': neighborhood_lon}, ignore_index=True)\n",
+    "    \n",
+    "    return new_york_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Borough</th>\n",
+       "      <th>Neighborhood</th>\n",
+       "      <th>Latitude</th>\n",
+       "      <th>Longitude</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>Bronx</td>\n",
+       "      <td>Wakefield</td>\n",
+       "      <td>40.894705</td>\n",
+       "      <td>-73.847201</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>Bronx</td>\n",
+       "      <td>Co-op City</td>\n",
+       "      <td>40.874294</td>\n",
+       "      <td>-73.829939</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>Bronx</td>\n",
+       "      <td>Eastchester</td>\n",
+       "      <td>40.887556</td>\n",
+       "      <td>-73.827806</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>Bronx</td>\n",
+       "      <td>Fieldston</td>\n",
+       "      <td>40.895437</td>\n",
+       "      <td>-73.905643</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>Bronx</td>\n",
+       "      <td>Riverdale</td>\n",
+       "      <td>40.890834</td>\n",
+       "      <td>-73.912585</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "  Borough Neighborhood   Latitude  Longitude\n",
+       "0   Bronx    Wakefield  40.894705 -73.847201\n",
+       "1   Bronx   Co-op City  40.874294 -73.829939\n",
+       "2   Bronx  Eastchester  40.887556 -73.827806\n",
+       "3   Bronx    Fieldston  40.895437 -73.905643\n",
+       "4   Bronx    Riverdale  40.890834 -73.912585"
+      ]
+     },
+     "execution_count": 9,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# get new york data\n",
+    "new_york_data=get_new_york_data()\n",
+    "new_york_data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(306, 4)"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "new_york_data.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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brnlFnZxNMStsMIKPPbYY8yePZtFF1205XzsLCxJktTPuvoEjBo1aiGXRG8EXU2CXnvttT7lYyAgSZI0QGwOpHZo13lkICBJkiR1IAMBSZIk9bvVV1+d8847r+n0kyZNIiK46667uk0zfvx4lllmmXYUbz4TJ04kIhbKKE/jxo1j44037vft2FlYkiRpIVr9pKsHdHuTztyjV+kPPfRQLrnkEs444wxOOumkufOvuOIK9t57bzKzqXz+9Kc/scQSS/Rq2+pf1ghIkiSpRyNHjuSss87iueeeazmPFVZYYch0lu6UB74ZCEiSJKlHO+20E2PGjOGMM87oNs2tt97Ktttuy+KLL86qq67Ksccey/Tp0+cur28a9MADD7DNNtswcuRI1ltvPSZMmEBEcMUVV8yT7z//+U/e/e53M2rUKDbaaCNuu+22+bZ9xRVXsPbaazNy5Eh23nlnJk+ePM/yCy64gDXXXJMRI0bwtre9jR/+8IfzLI8IvvOd77DnnnuyxBJL8OUvf3nusjvvvJNNN92UUaNGsdVWW/Hggw/2Ku9HH32UPffckyWXXJKlllqK/fbbj6lTp86T5swzz2SllVZi9OjRHH744cycObPb/dxOBgKSJEnq0bBhw/jKV77C+eefz5QpU+Zbfs8997Drrruyzz77cPfdd/Pzn/+cm2++maOPPrphfnPmzGGvvfZi1KhR/OEPf+C73/0up556asO0p556Kp/5zGe46667WHvttfnwhz/M7Nmz5y5/+eWXOf3007nkkku45ZZbeOGFF/jQhz40d/nll1/Occcdx6c//WnuvfdePv7xj3PYYYfxu9/9bp7tnHbaaey5557cc889fPSjH51n++eeey533HEHw4cPn2fZgvLOTPbaay+effZZbrzxRq677joeeugh9t9//7l5XHrppZx22mmcfvrp3HHHHay88sp8+9vf7ulwtE00265rIEXEcGAccCAwBngcGA98OTPnVGkCOA34T2BZ4A/AUZn51ya3sRQwbdq0aSy11FLtfguSJA0pA91OfajobXv67sycOZOHH36YsWPHMnLkyHmWDYU+As8//zxXXHEFW265Jeuttx4XXXTRPH0EDj74YBZffHEuvPDCuevdfPPNbLfddkyfPp2RI0ey+uqrc/zxx3P88cfzm9/8hve9731MnjyZMWPGADBhwgR23nlnLr/8cvbaay8mTZrE2LFj+d73vsfhhx8OwH333cf666/P/fffzzrrrMP48eM57LDDuP322/n3f/93oNQ0rLvuuvzhD39g8803Z+utt2b99dfnu9/97tyy7bfffkyfPp2rry77PiI4/vjj+drXvjY3zcSJE3n3u9/NhAkT2HHHHQG45ppr2GOPPZgxYwYjR45cYN7XXXcdu+++Ow8//DCrrrrqPO/hj3/8I5ttthlbbbUVG220ERdccMHcPLbYYgtmzpzZbUfpns6nF154gaWXXhpg6cx8oadjO1hrBE4EPgEcDawLnAB8FjimJs0JwKeqNJsBTwDXRcTogS2qJElSZzjrrLO45JJLuO++++aZf+eddzJ+/HiWXHLJudOuu+7KnDlzePjhh+fL58EHH2TVVVedGwQAbL755g23ueGGG879f+WVVwbgySefnDtv+PDhbLrppnNfr7POOiyzzDLcf//9ANx///1svfXW8+S59dZbz13epTaPZre/oLzvv/9+Vl111blBAMB66603X/m23HLLefKof91fBuuoQVsCv8zMrhB5UkR8GNgU5tYGHA+cnpmXVfMOAaYCBwAXzp+lJEmS+mLbbbdl11135ZRTTuHQQw+dO3/OnDl8/OMf59hjj51vndVWW22+eZnZ9EOxFl100bn/d60zZ86cedI0yqt2Xv3yRtvvbkSjBW2/p7y7e5+9ef/9abDWCNwM7BgRawNExEbANsA11fKxlCZDv+1aITNnATcCWzXKMCIWi4iluibAmgNJkqReOvPMM7nyyiu59dZb58575zvfyV//+lfe+ta3zjeNGDFivjzWWWcdHn300Xk6zf7pT39qqTyzZ8/mjjvumPv6wQcf5Pnnn2edddYBYN111+Xmm2+eZ51bb72Vddddt6Xt1VpQ3uuttx6PPvroPJ2X77vvPqZNmzY3zbrrrsvtt98+Tx71r/vLYK0ROAtYGnggIl4DhgGnZuZPq+Vd9UhT69abCrylmzxPpvQpkCRJUove/va3c+CBB3L++efPnXfiiSeyxRZbcNRRR/Gxj32MJZZYgvvvv5/rrrtunnRddt55Z9Zcc00OOeQQzj77bF588cW5nYV7e6d80UUX5ZhjjuEb3/gGiy66KEcffTRbbLHF3KZGn/3sZ9lvv/145zvfyY477siVV17JZZddxoQJE/qwF2gq75122okN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\n",
+      "text/plain": [
+       "<Figure size 900x500 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "plt.figure(figsize=(9,5), dpi = 100)\n",
+    "# title\n",
+    "plt.title('Number of Neighborhood for each Borough in New York City')\n",
+    "#On x-axis\n",
+    "plt.xlabel('Borough', fontsize = 15)\n",
+    "#On y-axis\n",
+    "plt.ylabel('No.of Neighborhood', fontsize=15)\n",
+    "#giving a bar plot\n",
+    "new_york_data.groupby('Borough')['Neighborhood'].count().plot(kind='bar')\n",
+    "#legend\n",
+    "plt.legend()\n",
+    "#displays the plot\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "KeyError",
+     "evalue": "'group'",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[0;31mKeyError\u001b[0m                                  Traceback (most recent call last)",
+      "\u001b[0;32m<ipython-input-16-7a917332b722>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m\u001b[0m\n\u001b[1;32m      5\u001b[0m \u001b[0;32mfor\u001b[0m \u001b[0mrow\u001b[0m \u001b[0;32min\u001b[0m \u001b[0mnew_york_data\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mvalues\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mtolist\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      6\u001b[0m     \u001b[0mBorough\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mNeighborhood\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mLatitude\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mLongitude\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mrow\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 7\u001b[0;31m     \u001b[0mvenues\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mget_venues\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mLatitude\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0mLongitude\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      8\u001b[0m     \u001b[0mindian_resturants\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mvenues\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0mvenues\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'Category'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m==\u001b[0m\u001b[0;34m'Indian Restaurant'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      9\u001b[0m     \u001b[0mprint\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m'('\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0mcount\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m'/'\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0mlen\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mnew_york_data\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m')'\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m'Indian Resturants in '\u001b[0m\u001b[0;34m+\u001b[0m\u001b[0mNeighborhood\u001b[0m\u001b[0;34m+\u001b[0m\u001b[0;34m', '\u001b[0m\u001b[0;34m+\u001b[0m\u001b[0mBorough\u001b[0m\u001b[0;34m+\u001b[0m\u001b[0;34m':'\u001b[0m\u001b[0;34m+\u001b[0m\u001b[0mstr\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mlen\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mindian_resturants\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m<ipython-input-15-8137be57436c>\u001b[0m in \u001b[0;36mget_venues\u001b[0;34m(lat, lng)\u001b[0m\n\u001b[1;32m     20\u001b[0m     \u001b[0;31m# get all the data\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m     21\u001b[0m     \u001b[0mresults\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mrequests\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mget\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0murl\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mjson\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m---> 22\u001b[0;31m     \u001b[0mvenue_data\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mresults\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m\"response\"\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'group'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;36m0\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'items'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m     23\u001b[0m     \u001b[0mvenue_details\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m     24\u001b[0m     \u001b[0;32mfor\u001b[0m \u001b[0mrow\u001b[0m \u001b[0;32min\u001b[0m \u001b[0mvenue_data\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;31mKeyError\u001b[0m: 'group'"
+     ]
+    }
+   ],
+   "source": [
+    "# prepare neighborhood list that contains indian resturants\n",
+    "column_names=['Borough', 'Neighborhood', 'ID','Name']\n",
+    "indian_rest_ny=pd.DataFrame(columns=column_names)\n",
+    "count=1\n",
+    "for row in new_york_data.values.tolist():\n",
+    "    Borough, Neighborhood, Latitude, Longitude=row\n",
+    "    venues = get_venues(Latitude,Longitude)\n",
+    "    indian_resturants=venues[venues['Category']=='Indian Restaurant']   \n",
+    "    print('(',count,'/',len(new_york_data),')','Indian Resturants in '+Neighborhood+', '+Borough+':'+str(len(indian_resturants)))\n",
+    "    for resturant_detail in indian_resturants.values.tolist():\n",
+    "        id, name , category=resturant_detail\n",
+    "        indian_rest_ny = indian_rest_ny.append({'Borough': Borough,\n",
+    "                                                'Neighborhood': Neighborhood, \n",
+    "                                                'ID': id,\n",
+    "                                                'Name' : name\n",
+    "                                               }, ignore_index=True)\n",
+    "    count+=1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Borough</th>\n",
+       "      <th>Neighborhood</th>\n",
+       "      <th>ID</th>\n",
+       "      <th>Name</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "Empty DataFrame\n",
+       "Columns: [Borough, Neighborhood, ID, Name]\n",
+       "Index: []"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "indian_rest_ny.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(9,5), dpi = 100)\n",
+    "# title\n",
+    "plt.title('Number of Indian Resturants for each Borough in New York City')\n",
+    "#On x-axis\n",
+    "plt.xlabel('Borough', fontsize = 15)\n",
+    "#On y-axis\n",
+    "plt.ylabel('No.of Indian Resturants', fontsize=15)\n",
+    "#giving a bar plot\n",
+    "indian_rest_ny.groupby('Borough')['ID'].count().plot(kind='bar')\n",
+    "#legend\n",
+    "plt.legend()\n",
+    "#displays the plot\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(9,5), dpi = 100)\n",
+    "# title\n",
+    "plt.title('Number of Indian Resturants for each Neighborhood in New York City')\n",
+    "#On x-axis\n",
+    "plt.xlabel('Neighborhood', fontsize = 15)\n",
+    "#On y-axis\n",
+    "plt.ylabel('No.of Indian Resturants', fontsize=15)\n",
+    "#giving a bar plot\n",
+    "indian_rest_ny.groupby('Neighborhood')['ID'].count().nlargest(5).plot(kind='bar')\n",
+    "#legend\n",
+    "plt.legend()\n",
+    "#displays the plot\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_ny[indian_rest_ny['Neighborhood']=='Floral Park']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# prepare neighborhood list that contains indian resturants\n",
+    "column_names=['Borough', 'Neighborhood', 'ID','Name','Likes','Rating','Tips']\n",
+    "indian_rest_stats_ny=pd.DataFrame(columns=column_names)\n",
+    "count=1\n",
+    "\n",
+    "\n",
+    "for row in indian_rest_ny.values.tolist():\n",
+    "    Borough,Neighborhood,ID,Name=row\n",
+    "    try:\n",
+    "        venue_details=get_venue_details(ID)\n",
+    "        print(venue_details)\n",
+    "        id,name,likes,rating,tips=venue_details.values.tolist()[0]\n",
+    "    except IndexError:\n",
+    "        print('No data available for id=',ID)\n",
+    "        # we will assign 0 value for these resturants as they may have been \n",
+    "        #recently opened or details does not exist in FourSquare Database\n",
+    "        id,name,likes,rating,tips=[0]*5\n",
+    "    print('(',count,'/',len(indian_rest_ny),')','processed')\n",
+    "    indian_rest_stats_ny = indian_rest_stats_ny.append({'Borough': Borough,\n",
+    "                                                'Neighborhood': Neighborhood, \n",
+    "                                                'ID': id,\n",
+    "                                                'Name' : name,\n",
+    "                                                'Likes' : likes,\n",
+    "                                                'Rating' : rating,\n",
+    "                                                'Tips' : tips\n",
+    "                                               }, ignore_index=True)\n",
+    "    count+=1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_ny.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny_csv.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny.info()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny['Likes']=indian_rest_stats_ny['Likes'].astype('float64')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny['Tips']=indian_rest_stats_ny['Tips'].astype('float64')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "indian_rest_stats_ny.info()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Resturant with maximum Likes\n",
+    "indian_rest_stats_ny.iloc[indian_rest_stats_ny['Likes'].idxmax()]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Resturant with maximum Rating\n",
+    "indian_rest_stats_ny.iloc[indian_rest_stats_ny['Rating'].idxmax()]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Resturant with maximum Tips\n",
+    "indian_rest_stats_ny.iloc[indian_rest_stats_ny['Tips'].idxmax()]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats=indian_rest_stats_ny.groupby('Neighborhood',as_index=False).mean()[['Neighborhood','Rating']]\n",
+    "ny_neighborhood_stats.columns=['Neighborhood','Average Rating']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats.sort_values(['Average Rating'],ascending=False).head(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_borough_stats=indian_rest_stats_ny.groupby('Borough',as_index=False).mean()[['Borough','Rating']]\n",
+    "ny_borough_stats.columns=['Borough','Average Rating']\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_borough_stats.sort_values(['Average Rating'],ascending=False).head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(9,5), dpi = 100)\n",
+    "# title\n",
+    "plt.title('Average rating of Indian Resturants for each Borough')\n",
+    "#On x-axis\n",
+    "plt.xlabel('Borough', fontsize = 15)\n",
+    "#On y-axis\n",
+    "plt.ylabel('Average Rating', fontsize=15)\n",
+    "#giving a bar plot\n",
+    "indian_rest_stats_ny.groupby('Borough').mean()['Rating'].plot(kind='bar')\n",
+    "#legend\n",
+    "plt.legend()\n",
+    "#displays the plot\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats=ny_neighborhood_stats[ny_neighborhood_stats['Average Rating']>=9.0]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats=pd.merge(ny_neighborhood_stats,new_york_data, on='Neighborhood')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats=ny_neighborhood_stats[['Borough','Neighborhood','Latitude','Longitude','Average Rating']]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# create map and display it\n",
+    "ny_map = folium.Map(location=geo_location('New York'), zoom_start=12)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# instantiate a feature group for the incidents in the dataframe\n",
+    "incidents = folium.map.FeatureGroup()\n",
+    "\n",
+    "# loop through the 100 crimes and add each to the incidents feature group\n",
+    "for lat, lng, in ny_neighborhood_stats[['Latitude','Longitude']].values:\n",
+    "    incidents.add_child(\n",
+    "        folium.CircleMarker(\n",
+    "            [lat, lng],\n",
+    "            radius=10, # define how big you want the circle markers to be\n",
+    "            color='yellow',\n",
+    "            fill=True,\n",
+    "            fill_color='blue',\n",
+    "            fill_opacity=0.6\n",
+    "        )\n",
+    "    )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_neighborhood_stats['Label']=ny_neighborhood_stats['Neighborhood']+', '+ny_neighborhood_stats['Borough']+'('+ny_neighborhood_stats['Average Rating'].map(str)+')'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# add pop-up text to each marker on the map\n",
+    "for lat, lng, label in ny_neighborhood_stats[['Latitude','Longitude','Label']].values:\n",
+    "    folium.Marker([lat, lng], popup=label).add_to(ny_map)        \n",
+    "# add incidents to map\n",
+    "ny_map.add_child(incidents)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ny_map = folium.Map(location=geo_location('New York'), zoom_start=12)\n",
+    "ny_geo = r'Borough Boundaries.geojson'\n",
+    "\n",
+    "ny_map.choropleth(\n",
+    "    geo_data=ny_geo,\n",
+    "    data=ny_borough_stats,\n",
+    "    columns=['Borough', 'Average Rating'],\n",
+    "    key_on='feature.properties.boro_name',\n",
+    "    fill_color='YlOrRd', \n",
+    "    fill_opacity=0.7, \n",
+    "    line_opacity=0.2,\n",
+    "    legend_name='Average Rating'\n",
+    ")\n",
+    "\n",
+    "# display map\n",
+    "# as this is huge map data , we will save it to a file\n",
+    "ny_map.save('borough_rating.html')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Conclusion\n",
+    "Astoria(Queens), Blissville(Queens), Civic Center(Manhattan) are some of the best neighborhoods for indian cuisine.\n",
+    "Manhattan have potential Indian Resturant Market\n",
+    "Staten Island ranks last in average rating of Indian Resturants.\n",
+    "Manhattan is the best place to stay if you prefer Indian Cuisine.\n",
+    "Limitations\n",
+    "The ranking is purely on basis of rating of resturants\n",
+    "The accuracy of data depends purely depends on the data provided by FourSquare\n",
+    "## Limitations\n",
+    "The ranking is purely on basis of rating of resturants\n",
+    "The accuracy of data depends purely depends on the data provided by FourSquare"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
